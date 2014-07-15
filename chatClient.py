@@ -36,7 +36,7 @@ from Crypto.Cipher import AES
 import pygame.camera, pygame.image, pygame.display, pygame.event
 
 HOST = '000.000.000.000' #
-PORT = 23333
+PORT = 63333
 ADDR = None
 
 udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
