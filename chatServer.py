@@ -334,7 +334,14 @@ class FileTrans(threading.Thread):
 							while name_size[1] > BUFSIZE:
 								if progress.poll() != None:
 									break
-								data = tcpconn.recv(BUFSIZE)
+								data = ""
+								while len(data) != BUFSIZE:
+									data_temp = tcpconn.recv(BUFSIZE - len(data))
+									if data_temp == "":
+										data = ""
+										break
+									else:
+										data += data_temp
 								if data == "":
 									os.system("zenity --error --text=\"传送失败: " + name_size[0] + "\"")
 									progress.kill()
@@ -344,7 +351,14 @@ class FileTrans(threading.Thread):
 								progress.stdin.write(str(100 - int(math.ceil((total_size - now_size) * 100.0 / total_size))) + "\n")
 								progress.stdin.flush()
 							if progress.poll() == None:
-								data = tcpconn.recv(name_size[1])
+								data = ""
+								while len(data) != name_size[1]:
+									data_temp = tcpconn.recv(name_size[1] - len(data))
+									if data_temp == "":
+										data = ""
+										break
+									else:
+										data += data_temp
 								if data == "":
 									os.system("zenity --error --text=\"传送失败: " + name_size[0] + "\"")
 									progress.kill()
@@ -385,7 +399,14 @@ class FileTrans(threading.Thread):
 						name_size[1] = int(name_size[1])
 						save_fd = open(save_dir + "/" + name_size[0], "wb")
 						while name_size[1] > BUFSIZE:
-							data = tcpconn.recv(BUFSIZE)
+							data = ""
+							while len(data) != BUFSIZE:
+								data_temp = tcpconn.recv(BUFSIZE - len(data))
+								if data_temp == "":
+									data = ""
+									break
+								else:
+									data += data_temp
 							if data == "":
 								os.system("zenity --error --text=\"传送失败: " + name_size[0] + "\"")
 								data = None
@@ -396,7 +417,14 @@ class FileTrans(threading.Thread):
 							save_fd.close()
 							os.system("rm -f \"" + save_dir + "/" + name_size[0] + "\"")
 							break
-						data = tcpconn.recv(name_size[1])
+						data = ""
+						while len(data) != name_size[1]:
+							data_temp = tcpconn.recv(name_size[1] - len(data))
+							if data_temp == "":
+								data = ""
+								break
+							else:
+								data += data_temp
 						if data == "":
 							os.system("zenity --error --text=\"传送失败: " + name_size[0] + "\"")
 							save_fd.close()
@@ -489,7 +517,14 @@ class InstVideo(threading.Thread):
 			while True:
 				count = 0
 				tcpconn, tcpaddr = video_server.accept()
-				data = tcpconn.recv(BUFSIZE)
+				data = ""
+				while len(data) != BUFSIZE:
+					data_temp = tcpconn.recv(BUFSIZE - len(data))
+					if data_temp == "":
+						data = ""
+						break
+					else:
+						data += data_temp
 				if not self.started and data[:4] == "@beg":
 					self.surface_buffer = ""
 					self.new_surface = None
@@ -507,7 +542,14 @@ class InstVideo(threading.Thread):
 					count += BUFSIZE - 4
 					running = True
 					while running:
-						data = tcpconn.recv(BUFSIZE)
+						data = ""
+						while len(data) != BUFSIZE:
+							data_temp = tcpconn.recv(BUFSIZE - len(data))
+							if data_temp == "":
+								data = ""
+								break
+							else:
+								data += data_temp
 						if data == "" or data[:4] == "@end":
 							break
 						if 230400 - count >= BUFSIZE:
@@ -576,7 +618,7 @@ class InstCamera(threading.Thread):
 						self.toend = True
 				elif self.started and self.toend:
 					try:
-						cam_client.sendall("@end")
+						cam_client.sendall("@end" + '\0' * (BUFSIZE - 4))
 					except Exception:
 						pass
 					cam_client.close()
