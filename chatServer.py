@@ -35,7 +35,7 @@ from Crypto.Cipher import AES
 import pygame.camera, pygame.image, pygame.display, pygame.event
 
 HOST = None
-PORT = 23333
+PORT = 63333
 ADDR = None
 addr = None
 
