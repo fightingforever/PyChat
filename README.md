@@ -14,7 +14,7 @@ Dependences:
 > zenity<br>
 > wmctrl<br>
 
-Port Bind：23331~23335
+Port Bind：63331~63335
 
 这是我为了解决在校园网内Linux下无法和女朋友聊天写了一个小小的IM。主要功能如下：
 > 1. 聊天内容及历史记录气泡显示，输入@h或者@history查看历史记录。显示效果并没有使用ncurses，而是自己用console codes写的，如果发现任何bug请联系作者。需要注意的是：Ctrl+C关闭窗口才会保存完整的历史记录，直接点击close窗口按钮会使历史记录丢失；<br>
