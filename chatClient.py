@@ -651,7 +651,7 @@ def main(argv):
 	tcp_server.bind(("0.0.0.0", PORT + 2))
 	tcp_server.listen(10)
 	
-	video_server.bind((ADDR[0], PORT - 2))
+	video_server.bind(("0.0.0.0", PORT - 2))
 	video_server.listen(1)
 
 	last_time = datetime.datetime.now()
