@@ -291,7 +291,7 @@ class TInput(threading.Thread):
 			os.popen("zenity --error --text=\"" + str(e) + "\"")
 			sys.exit(1)
 
-class file_trans(threading.Thread):
+class FileTrans(threading.Thread):
 	def run(self):
 		global tcp_server
 
@@ -648,7 +648,7 @@ def main(argv):
 	
 	tMsg = TMsg()
 	tInput = TInput()
-	file_trans = file_trans()
+	file_trans = FileTrans()
 	instant_video = InstVideo()
 	instant_camera = InstCamera()
 	tMsg.setDaemon(True)
