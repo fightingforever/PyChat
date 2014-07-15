@@ -487,8 +487,8 @@ class InstVideo(threading.Thread):
 					self.video_surface = None
 					self.started = True
 					
-#					if not instant_camera.started:
-#						instant_camera.tostart = True
+					if not instant_camera.started:
+						instant_camera.tostart = True
 					
 					pygame.display.init()
 					pygame.display.set_caption("PyChat")
