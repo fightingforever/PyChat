@@ -17,11 +17,12 @@ from Crypto.Cipher import AES
 
 import pygame.camera, pygame.image, pygame.display, pygame.event
 
-HOST = '115.154.119.127' #
+HOST = None
 PORT = 23333
 ADDR = None
+addr = None
 
-udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -41,14 +42,14 @@ last_message = None
 
 last_time = None
 
-heart_beat_count = 0
+last_heart_beat = None
 
 history_fd = None
 
 def sig_hdr(sig_num, frame):
-	global udp_client, tcp_server, video_server, history_fd
+	global udp_server, tcp_server, video_server, history_fd
 	
-	udp_client.close()
+	udp_server.close()
 	tcp_server.close()
 	video_server.close()
 	history_fd.flush()
@@ -149,30 +150,35 @@ def wrap(data, left):
 
 class TMsg(threading.Thread):
 	def run(self):
-		global udp_client, BUFSIZE, row, last_row, last_message, last_time, heart_beat_count, history_fd
+		global addr, udp_server, BUFSIZE, row, last_row, last_message, last_time, last_heart_beat, history_fd
 	
 		try:
 			while True:
-				data, addr = udp_client.recvfrom(BUFSIZE)
-				if addr != ADDR:
-					continue
+				data, new_addr = udp_server.recvfrom(BUFSIZE)
 				
 				if data == "":
 					continue
 			
-				if data == '\xFE\xDC\xBA':
-					if heart_beat_count >= 5:
-						print_in_mid("Connected with Host!", isInfo = True)
+				if data == b'\xAB\xCD\xEF':
+					udp_server.sendto(b'\xFE\xDC\xBA', new_addr)
+					if not last_heart_beat or addr != new_addr:
+						last_heart_beat = datetime.datetime.now()
+						addr = new_addr
+						print_in_mid("IP: " + addr[0] + " connected!", isInfo = True)
 						os.system("wmctrl -F -a PyChat")
-					heart_beat_count = 0
+					else:
+						last_heart_beat = datetime.datetime.now()
+						addr = new_addr
 				else:
 					aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
 					data = aes.decrypt(data).rstrip('\0')
 					if data[0] == '\0' and data[1] != '\0':
+						addr = new_addr
+						
 						data = data[1:]
 						
 						aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
-						udp_client.sendto(aes.encrypt("\0\0" + data[:data.find('\0')] + "\0" * (16 - (2 + data.find('\0')) % 16)), ADDR)
+						udp_server.sendto(aes.encrypt("\0\0" + data[:data.find('\0')] + "\0" * (16 - (2 + data.find('\0')) % 16)), addr)
 						data = data[data.find('\0') + 1:]
 			
 						if (datetime.datetime.now() - last_time).seconds > 300:
@@ -186,7 +192,7 @@ class TMsg(threading.Thread):
 						if row > 20:
 							row = 20
 						os.system("wmctrl -F -a PyChat")
-					elif data[0:2] == b"\0\0":
+					elif new_addr == addr and data[0:2] == b"\0\0":
 						data = data[2:].rstrip("\0")
 						if int(data) == last_message:
 							last_message = None
@@ -198,7 +204,7 @@ class TInput(threading.Thread):
 	data = ""
 	
 	def run(self):
-		global udp_client, ADDR, file_trans, row, last_row, message_flag, last_message, last_time, history_fd
+		global ADDR, addr, udp_server, file_trans, instant_camera, row, last_row, message_flag, last_message, last_time, history_fd
 	
 		try:
 			while True:
@@ -211,11 +217,15 @@ class TInput(threading.Thread):
 				if data == "":
 					sys.stdout.write('\33[22;1H')
 					sys.stdout.flush()
+				elif not addr:
+					sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
+					sys.stdout.flush()
+					os.system("zenity --title=PyChat --warning --text=无人在线！ 1>&- 2>&-")
 				else:
 					if data == "@history" or data == "@h":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
-						os.system("gnome-terminal --title 历史记录 --hide-menubar -e 'sh -c \"" + cur_file_dir() + "/chatClient.py --history\"'")
+						os.system("gnome-terminal --title 历史记录 --hide-menubar -e 'sh -c \"" + cur_file_dir() + "/chatServer.py --history\"'")
 					elif data == "@file" or data == "@f":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
@@ -252,7 +262,7 @@ class TInput(threading.Thread):
 							print_in_mid(datetime.datetime.strftime(last_time, '%Y-%m-%d %H:%M:%S'))
 					
 						aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
-						udp_client.sendto(aes.encrypt('\0' + str(last_message) + '\0' + data + '\0' * (16 - (len(data) + 2 + len(str(message_flag))) % 16)), ADDR)
+						udp_server.sendto(aes.encrypt('\0' + str(last_message) + '\0' + data + '\0' * (16 - (len(data) + 2 + len(str(message_flag))) % 16)), addr)
 						
 						sys.stdout.write('\33[' + str(row) + ';1H' + wrap(data, False) + '\n\33[22;1H')
 						sys.stdout.flush()
@@ -386,11 +396,11 @@ class file_trans(threading.Thread):
 					
 	
 	def send_file(self, paths):
-		global ADDR, PORT
+		global addr, PORT
 
 		files = paths.split("|")
 		tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		tcp_client.connect((ADDR[0], PORT + 1))
+		tcp_client.connect((addr[0], PORT + 2))
 		data = ""
 		for f in files:
 			data += f[f.rfind("/") + 1:] + "|"
@@ -409,11 +419,11 @@ class file_trans(threading.Thread):
 		tcp_client.close()
 	
 	def send_image(self, paths):
-		global ADDR, PORT
+		global addr, PORT
 
 		files = paths.split("|")
 		tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		tcp_client.connect((ADDR[0], PORT + 1))
+		tcp_client.connect((addr[0], PORT + 2))
 		data = ""
 		for f in files:
 			data += f[f.rfind("/") + 1:] + "|"
@@ -469,8 +479,8 @@ class InstVideo(threading.Thread):
 					self.video_surface = None
 					self.started = True
 					
-#					if not instant_camera.started:
-#						instant_camera.tostart = True
+					if not instant_camera.started:
+						instant_camera.tostart = True
 					
 					pygame.display.init()
 					pygame.display.set_caption("PyChat")
@@ -538,7 +548,7 @@ class InstCamera(threading.Thread):
 					self.tostart = False
 				elif self.started and not self.toend:
 					cam_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-					cam_client.connect((ADDR[0], PORT - 1))
+					cam_client.connect((addr[0], PORT - 2))
 					try:
 						cam_client.sendall("@beg" + pygame.image.tostring(self.cam.get_image(), "RGB") + '\0' * (BUFSIZE - (230400 + 4) % BUFSIZE))
 						time.sleep(0.25)
@@ -565,25 +575,11 @@ class InstCamera(threading.Thread):
 			os.popen("zenity --error --text=\"" + str(e) + "\"")
 			sys.exit(1)
 
-class HeartBeat(threading.Thread):
-	def run(self):
-		global udp_client, ADDR, heart_beat_count
-		
-		while True:
-			if heart_beat_count < 5:
-				udp_client.sendto('\xAB\xCD\xEF', ADDR)
-				heart_beat_count += 1
-			elif heart_beat_count == 5:
-				print_in_mid("Diconnected with Host!", isInfo = True)
-				heart_beat_count = 6
-				os.system("wmctrl -F -a PyChat")
-			else:
-				udp_client.sendto('\xAB\xCD\xEF', ADDR)
-			time.sleep(5)
-
 def main(argv):
-	global HOST, ADDR, udp_client, tcp_server, video_server, file_trans, instant_camera, row, last_time, history_fd
+	global HOST, ADDR, addr, udp_server, tcp_server, video_server, file_trans, instant_camera, row, last_time, last_heart_beat, history_fd
 	
+#	HOST = get_public_addr()
+	HOST = "0.0.0.0"
 	ADDR = (HOST, PORT)
 	
 	history_fd = open(os.getenv("HOME") + "/.chat_history.dat", "a+")
@@ -615,25 +611,16 @@ def main(argv):
 			sys.exit(0)
 	
 	os.system("resize -s 24 80 > /dev/null")
-	ip = raw_input("输入主机IP：（默认" + str(HOST) + "）")
-	if ip != '':
-		if len(ip) > 15:
-			ip = ip[:15]
-		ADDR = (ip, ADDR[1])
-		thefd = open(cur_file_dir() + "/chatClient.py", "r+")
-		content = thefd.read()
-		thefd.seek(content.find("HOST = ") + 8, 0)
-		thefd.write(ip + "' #")
-		thefd.flush()
-		thefd.close()
 	
 	signal.signal(signal.SIGINT, sig_hdr)
 	signal.signal(signal.SIGTERM, sig_hdr)
 	
-	tcp_server.bind(("0.0.0.0", PORT + 2))
+	udp_server.bind(ADDR)
+	
+	tcp_server.bind((ADDR[0], PORT + 1))
 	tcp_server.listen(10)
 	
-	video_server.bind((ADDR[0], PORT - 2))
+	video_server.bind((ADDR[0], PORT - 1))
 	video_server.listen(1)
 
 	last_time = datetime.datetime.now()
@@ -647,20 +634,22 @@ def main(argv):
 	file_trans = file_trans()
 	instant_video = InstVideo()
 	instant_camera = InstCamera()
-	heartBeat = HeartBeat()
 	tMsg.setDaemon(True)
 	tInput.setDaemon(True)
 	file_trans.setDaemon(True)
 	instant_video.setDaemon(True)
 	instant_camera.setDaemon(True)
-	heartBeat.setDaemon(True)
 	tMsg.start()
 	tInput.start()
 	file_trans.start()
 	instant_video.start()
 	instant_camera.start()
-	heartBeat.start()
-	while tMsg.isAlive() and tInput.isAlive() and file_trans.isAlive() and instant_video.isAlive() and instant_camera.isAlive() and heartBeat.isAlive():
+	while tMsg.isAlive() and tInput.isAlive() and file_trans.isAlive() and instant_video.isAlive() and instant_camera.isAlive():
+		if addr and last_heart_beat and (datetime.datetime.now() - last_heart_beat).seconds > 300:
+			print_in_mid("IP: " + addr[0] + " disconnected!", isInfo = True)
+			addr = None
+			last_heart_beat = None
+			os.system("wmctrl -F -a PyChat")
 		time.sleep(1)
 
 if __name__ == "__main__":
