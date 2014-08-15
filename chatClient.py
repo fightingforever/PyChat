@@ -34,7 +34,7 @@ from Crypto.Cipher import AES
 
 import pygame.camera, pygame.image, pygame.display, pygame.event
 
-HOST = '000.000.000.000' #
+HOST = '127.0.0.1' #127' #
 PORT = 63333
 ADDR = None
 
@@ -269,7 +269,12 @@ class TInput(threading.Thread):
 							print_in_mid(datetime.datetime.strftime(last_time, '%Y-%m-%d %H:%M:%S'))
 					
 						aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
-						udp_client.sendto(aes.encrypt('\0' + str(last_message) + '\0' + data + '\0' * (16 - (len(data) + 2 + len(str(message_flag))) % 16)), ADDR)
+						try: ##
+							udp_client.sendto(aes.encrypt('\0' + str(last_message) + '\0' + data + '\0' * (16 - (len(data) + 2 + len(str(last_message))) % 16)), ADDR)
+						except Exception:
+							last_message = None
+							message_flag -= 1
+							continue
 						
 						sys.stdout.write('\33[' + str(row) + ';1H' + wrap(data, False) + '\n\33[22;1H')
 						sys.stdout.flush()
