@@ -62,6 +62,9 @@ heart_beat_count = 0
 
 history_fd = None
 
+## !experiment!
+is_you_leave = False
+
 def sig_hdr(sig_num, frame):
 	global udp_client, tcp_server, video_server, history_fd
 	
@@ -166,7 +169,7 @@ def wrap(data, left):
 
 class TMsg(threading.Thread):
 	def run(self):
-		global udp_client, BUFSIZE, row, last_row, last_message, last_time, heart_beat_count, history_fd
+		global udp_client, BUFSIZE, row, last_row, last_message, last_time, heart_beat_count, history_fd, is_you_leave
 	
 		try:
 			while True:
@@ -177,15 +180,22 @@ class TMsg(threading.Thread):
 				if data == "":
 					continue
 			
-				if data == '\xFE\xDC\xBA':
+				if data == b'\xFE\xDC\xBA':
 					if heart_beat_count >= 5:
 						print_in_mid("Connected with Host!", isInfo = True)
 						os.system("wmctrl -F -a PyChat")
 					heart_beat_count = 0
+				elif data == b'\x11\x11\x11':
+					print_in_mid("Host left!")
+					is_you_leave = True
 				else:
 					aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
 					data = aes.decrypt(data).rstrip('\0')
 					if data[0] == '\0' and data[1] != '\0':
+						if is_you_leave:
+							print_in_mid("Host online!")
+							is_you_leave = False
+						
 						data = data[1:]
 						
 						aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
@@ -215,7 +225,7 @@ class TInput(threading.Thread):
 	data = ""
 	
 	def run(self):
-		global udp_client, ADDR, file_trans, row, last_row, message_flag, last_message, last_time, history_fd
+		global udp_client, ADDR, file_trans, row, last_row, message_flag, last_message, last_time, history_fd, is_you_leave
 	
 		try:
 			while True:
@@ -228,7 +238,14 @@ class TInput(threading.Thread):
 				if data == "":
 					sys.stdout.write('\33[22;1H')
 					sys.stdout.flush()
+				elif data == "@l" or data == "@leave":
+					sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
+					sys.stdout.flush()
+					udp_client.sendto(b'\x11\x11\x11', ADDR)
 				else:
+					if data != "@history" and data != "@h" and is_you_leave:
+						print_in_mid("Host left, may cannot reply immediately")
+						
 					if data == "@history" or data == "@h":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
