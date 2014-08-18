@@ -234,7 +234,7 @@ class TInput(threading.Thread):
 				if data == "":
 					sys.stdout.write('\33[22;1H')
 					sys.stdout.flush()
-				elif not addr:
+				elif data != "@history" and data != "@h" and not addr:
 					sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 					sys.stdout.flush()
 					os.system("zenity --title=PyChat --warning --text=无人在线！ 1>&- 2>&-")
@@ -281,7 +281,7 @@ class TInput(threading.Thread):
 						aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
 						try: ##
 							udp_server.sendto(aes.encrypt('\0' + str(last_message) + '\0' + data + '\0' * (16 - (len(data) + 2 + len(str(last_message))) % 16)), addr)
-						except Exception:
+						except:
 							last_message = None
 							message_flag -= 1
 							continue
@@ -302,8 +302,18 @@ class FileTrans(threading.Thread):
 
 		try:
 			while True:
-				tcpconn, tcpaddr = tcp_server.accept()
-				data = tcpconn.recv(BUFSIZE)
+				while True:
+					try:
+						tcpconn, tcpaddr = tcp_server.accept()
+					except:
+						continue
+					break
+				try:
+					data = tcpconn.recv(BUFSIZE)
+				except:
+					os.popen("zenity --error --text=\"" + "文件传输请求超时" + "\"")
+					tcpconn.close()
+					continue
 				if data[0] == "\xFF":
 					name_sizes = data[1:].split("||")
 					for i in range(len(name_sizes)):
@@ -321,7 +331,12 @@ class FileTrans(threading.Thread):
 					if save_dir == "":
 						tcpconn.close()
 						continue
-					tcpconn.sendall(selections)
+					try:
+						tcpconn.sendall(selections)
+					except Exception, e:
+						os.popen("zenity --error --text=\"" + str(e) + "\"")
+						tcpconn.close()
+						continue
 					progress = subprocess.Popen("zenity --title=PyChat --progress --text=\"waiting...\" --auto-close", shell = True, stdin = subprocess.PIPE)
 					total_size = 0
 					now_size = 0
@@ -341,7 +356,11 @@ class FileTrans(threading.Thread):
 									break
 								data = ""
 								while len(data) != BUFSIZE:
-									data_temp = tcpconn.recv(BUFSIZE - len(data))
+									try:
+										data_temp = tcpconn.recv(BUFSIZE - len(data))
+									except:
+										data = ""
+										break
 									if data_temp == "":
 										data = ""
 										break
@@ -353,12 +372,23 @@ class FileTrans(threading.Thread):
 								save_fd.write(data)
 								name_size[1] -= BUFSIZE
 								now_size += BUFSIZE
-								progress.stdin.write(str(100 - int(math.ceil((total_size - now_size) * 100.0 / total_size))) + "\n")
-								progress.stdin.flush()
+								if progress.poll() == None:
+									try: ## simulate atomic operation
+										progress.stdin.write(str(100 - int(math.ceil((total_size - now_size) * 100.0 / total_size))) + "\n")
+										progress.stdin.flush()
+									except:
+										progress.wait()
+										break
+								else:
+									break
 							if progress.poll() == None:
 								data = ""
 								while len(data) != name_size[1]:
-									data_temp = tcpconn.recv(name_size[1] - len(data))
+									try:
+										data_temp = tcpconn.recv(name_size[1] - len(data))
+									except:
+										data = ""
+										break
 									if data_temp == "":
 										data = ""
 										break
@@ -369,8 +399,12 @@ class FileTrans(threading.Thread):
 									progress.kill()
 								save_fd.write(data)
 								now_size += name_size[1]
-								progress.stdin.write(str(100 - int(math.ceil((total_size - now_size) * 100.0 / total_size))) + "\n")
-								progress.stdin.flush()
+								if progress.poll() == None:
+									try: ## simulate atomic operation
+										progress.stdin.write(str(100 - int(math.ceil((total_size - now_size) * 100.0 / total_size))) + "\n")
+										progress.stdin.flush()
+									except:
+										progress.wait()
 						if progress.poll() == None or progress.poll() == 0:
 							save_fd.flush()
 							save_fd.close()
@@ -396,7 +430,12 @@ class FileTrans(threading.Thread):
 					if save_dir == "":
 						tcpconn.close()
 						continue
-					tcpconn.sendall(selections)
+					try:
+						tcpconn.sendall(selections)
+					except Exception, e:
+						os.popen("zenity --error --text=\"" + str(e) + "\"")
+						tcpconn.close()
+						continue
 					for selection in selections.split("|"):
 						name_size = name_sizes[int(selection) - 1]
 						while os.path.exists(save_dir + "/" + name_size[0]):
@@ -406,7 +445,11 @@ class FileTrans(threading.Thread):
 						while name_size[1] > BUFSIZE:
 							data = ""
 							while len(data) != BUFSIZE:
-								data_temp = tcpconn.recv(BUFSIZE - len(data))
+								try:
+									data_temp = tcpconn.recv(BUFSIZE - len(data))
+								except:
+									data = ""
+									break
 								if data_temp == "":
 									data = ""
 									break
@@ -424,7 +467,11 @@ class FileTrans(threading.Thread):
 							break
 						data = ""
 						while len(data) != name_size[1]:
-							data_temp = tcpconn.recv(name_size[1] - len(data))
+							try:
+								data_temp = tcpconn.recv(name_size[1] - len(data))
+							except:
+								data = ""
+								break
 							if data_temp == "":
 								data = ""
 								break
@@ -455,8 +502,18 @@ class FileTrans(threading.Thread):
 		for f in files:
 			data += f[f.rfind("/") + 1:] + "|"
 			data += str(os.path.getsize(f)) + "||"
-		tcp_client.sendall("\xFF" + data[:-2])
-		selections = tcp_client.recv(BUFSIZE)
+		try:
+			tcp_client.sendall("\xFF" + data[:-2])
+		except Exception, e:
+			os.popen("zenity --error --text=\"" + str(e) + "\"")
+			tcp_client.close()
+			return
+		try:
+			selections = tcp_client.recv(BUFSIZE)
+		except:
+			os.popen("zenity --error --text=\"" + "文件传输请求超时" + "\"")
+			tcp_client.close()
+			return
 		if selections == "":
 			tcp_client.close()
 			return
@@ -466,6 +523,7 @@ class FileTrans(threading.Thread):
 			except Exception, e:
 				os.system("zenity --error --text=\"传送失败: " + files[int(selection) - 1] + "\"")
 				tcp_client.close()
+				return
 		tcp_client.close()
 	
 	def send_image(self, paths):
@@ -478,8 +536,18 @@ class FileTrans(threading.Thread):
 		for f in files:
 			data += f[f.rfind("/") + 1:] + "|"
 			data += str(os.path.getsize(f)) + "||"
-		tcp_client.sendall("\xEE" + data[:-2])
-		selections = tcp_client.recv(BUFSIZE)
+		try:
+			tcp_client.sendall("\xEE" + data[:-2])
+		except Exception, e:
+			os.popen("zenity --error --text=\"" + str(e) + "\"")
+			tcp_client.close()
+			return
+		try:
+			selections = tcp_client.recv(BUFSIZE)
+		except:
+			os.popen("zenity --error --text=\"" + "文件传输请求超时" + "\"")
+			tcp_client.close()
+			return
 		if selections == "":
 			tcp_client.close()
 			return
@@ -489,6 +557,7 @@ class FileTrans(threading.Thread):
 			except Exception, e:
 				os.system("zenity --error --text=\"传送失败: " + files[int(selection) - 1] + "\"")
 				tcp_client.close()
+				return
 		tcp_client.close()
 	
 	def sizefbyte(self, byte_count):
@@ -521,10 +590,19 @@ class InstVideo(threading.Thread):
 		try:
 			while True:
 				count = 0
-				tcpconn, tcpaddr = video_server.accept()
+				while True:
+					try:
+						tcpconn, tcpaddr = video_server.accept()
+					except:
+						continue
+					break
 				data = ""
 				while len(data) != BUFSIZE:
-					data_temp = tcpconn.recv(BUFSIZE - len(data))
+					try:
+						data_temp = tcpconn.recv(BUFSIZE - len(data))
+					except:
+						data = ""
+						break
 					if data_temp == "":
 						data = ""
 						break
@@ -549,7 +627,11 @@ class InstVideo(threading.Thread):
 					while running:
 						data = ""
 						while len(data) != BUFSIZE:
-							data_temp = tcpconn.recv(BUFSIZE - len(data))
+							try:
+								data_temp = tcpconn.recv(BUFSIZE - len(data))
+							except:
+								data = ""
+								break
 							if data_temp == "":
 								data = ""
 								break
@@ -597,7 +679,7 @@ class InstCamera(threading.Thread):
 		if self.cam and self.started:
 			try:
 				self.cam.stop()
-			except Exception:
+			except:
 				pass
 		pygame.camera.quit()
 	
@@ -619,12 +701,12 @@ class InstCamera(threading.Thread):
 						while not self.toend:
 							cam_client.sendall(pygame.image.tostring(self.cam.get_image(), "RGB") + '\0' * (BUFSIZE - 230400 % BUFSIZE))
 							time.sleep(0.25)
-					except Exception:
+					except:
 						self.toend = True
 				elif self.started and self.toend:
 					try:
 						cam_client.sendall("@end" + '\0' * (BUFSIZE - 4))
-					except Exception:
+					except:
 						pass
 					cam_client.close()
 					self.cam.stop()
@@ -683,9 +765,11 @@ def main(argv):
 	
 	tcp_server.bind((ADDR[0], PORT + 1))
 	tcp_server.listen(10)
+	tcp_server.settimeout(10)
 	
 	video_server.bind((ADDR[0], PORT - 1))
 	video_server.listen(1)
+	video_server.settimeout(10)
 
 	last_time = datetime.datetime.now()
 	
