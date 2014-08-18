@@ -63,6 +63,9 @@ last_heart_beat = None
 
 history_fd = None
 
+## !experiment!
+is_you_leave = False
+
 def sig_hdr(sig_num, frame):
 	global udp_server, tcp_server, video_server, history_fd
 	
@@ -167,7 +170,7 @@ def wrap(data, left):
 
 class TMsg(threading.Thread):
 	def run(self):
-		global addr, udp_server, BUFSIZE, row, last_row, last_message, last_time, last_heart_beat, history_fd
+		global addr, udp_server, BUFSIZE, row, last_row, last_message, last_time, last_heart_beat, history_fd, is_you_leave
 	
 		try:
 			while True:
@@ -186,10 +189,17 @@ class TMsg(threading.Thread):
 					else:
 						last_heart_beat = datetime.datetime.now()
 						addr = new_addr
+				elif data == b'\x11\x11\x11':
+					print_in_mid("Client left!")
+					is_you_leave = True
 				else:
 					aes = AES.new(b'fuck your ass!??', AES.MODE_CBC, b'who is daddy!!??')
 					data = aes.decrypt(data).rstrip('\0')
 					if data[0] == '\0' and data[1] != '\0':
+						if is_you_leave:
+							print_in_mid("Client online!")
+							is_you_leave = False
+						
 						addr = new_addr
 						
 						data = data[1:]
@@ -221,7 +231,7 @@ class TInput(threading.Thread):
 	data = ""
 	
 	def run(self):
-		global ADDR, addr, udp_server, file_trans, instant_camera, row, last_row, message_flag, last_message, last_time, history_fd
+		global ADDR, addr, udp_server, file_trans, instant_camera, row, last_row, message_flag, last_message, last_time, history_fd, is_you_leave
 	
 		try:
 			while True:
@@ -238,7 +248,14 @@ class TInput(threading.Thread):
 					sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 					sys.stdout.flush()
 					os.system("zenity --title=PyChat --warning --text=无人在线！ 1>&- 2>&-")
+				elif data == "@l" or data == "@leave":
+					sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
+					sys.stdout.flush()
+					udp_server.sendto(b'\x11\x11\x11', addr)
 				else:
+					if data != "@history" and data != "@h" and is_you_leave:
+						print_in_mid("Client left, may cannot reply immediately")
+						
 					if data == "@history" or data == "@h":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
