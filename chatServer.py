@@ -261,7 +261,8 @@ class TInput(threading.Thread):
 						os.system("mkdir -p ~/Pictures/PyChat/ScreenShot")
 						paths = os.getenv("HOME") + "/Pictures/PyChat/ScreenShot/" + datetime.datetime.strftime(last_time, '%Y-%m-%d %H:%M:%S') + ".png"
 						os.system("gnome-screenshot -a -f \"" + paths + "\" 1>&- 2>&-; sleep 1")
-						file_trans.send_image(paths)
+						if os.path.exists(paths):
+							file_trans.send_image(paths)
 					elif data == "@v" or data == "@video":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
@@ -759,6 +760,7 @@ def main(argv):
 	os.system("resize -s 24 80 > /dev/null")
 	
 	signal.signal(signal.SIGINT, sig_hdr)
+	signal.signal(signal.SIGQUIT, sig_hdr)
 	signal.signal(signal.SIGTERM, sig_hdr)
 	
 	udp_server.bind(ADDR)
