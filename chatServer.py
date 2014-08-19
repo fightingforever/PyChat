@@ -20,6 +20,7 @@
 
 import socket
 import threading
+import thread
 import signal
 import time
 import sys
@@ -265,13 +266,13 @@ class TInput(threading.Thread):
 						sys.stdout.flush()
 						paths = os.popen("zenity --title=PyChat-文件传输 --file-selection --multiple").read().strip("\n")
 						if paths != "":
-							file_trans.send_file(paths)
+							thread.start_new_thread(file_trans.send_file, (paths, ))
 					elif data == "@i" or data == "@image":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
 						paths = os.popen("zenity --title=PyChat-图片传输 --file-selection --multiple --file-filter=\"BMP/JPG/JPEG/PNG/GIF|*.BMP *.bmp *.JPG *.jpg *.JPEG *.jpeg *.PNG *.png *.GIF *.gif\"").read().strip("\n")
 						if paths != "":
-							file_trans.send_image(paths)
+							thread.start_new_thread(file_trans.send_image, (paths, ))
 					elif data == "@s" or data == "@screenshot":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
@@ -279,7 +280,7 @@ class TInput(threading.Thread):
 						paths = os.getenv("HOME") + "/Pictures/PyChat/ScreenShot/" + datetime.datetime.strftime(last_time, '%Y-%m-%d %H:%M:%S') + ".png"
 						os.system("gnome-screenshot -a -f \"" + paths + "\" 1>&- 2>&-; sleep 1")
 						if os.path.exists(paths):
-							file_trans.send_image(paths)
+							thread.start_new_thread(file_trans.send_image, (paths, ))
 					elif data == "@v" or data == "@video":
 						sys.stdout.write("\33[22;1H\33[2K\33[23;1H\33[2K\33[24;1H\33[2K\33[22;1H")
 						sys.stdout.flush()
