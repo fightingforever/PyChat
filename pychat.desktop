@@ -3,6 +3,6 @@ Type=Application
 Name=PyChat
 X-GNOME-FullName=Local Chat via Python
 Icon=cheese
-Exec=gnome-terminal -e 'Your Path'/chat[Server/Client].py --hide-menubar --geometry=80x24 --title=PyChat
+Exec=gnome-terminal -e /home/guangmu/Apps/localchat/chatServer.py --hide-menubar --geometry=80x24 --title=PyChat
 Terminal=false
 StartupNotify=true
